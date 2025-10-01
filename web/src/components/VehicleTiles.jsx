@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-
 const API = "http://localhost:8080";
 
 export default function VehicleTiles({ selectedId, onSelect }) {
@@ -8,9 +7,15 @@ export default function VehicleTiles({ selectedId, onSelect }) {
 
   useEffect(() => {
     fetch(`${API}/api/vehicles/summary`)
-      .then(r => r.json())
-      .then(setRows)
-      .catch(e => setErr(e.message));
+      .then(async r => {
+        if (!r.ok) throw new Error(`summary ${r.status}`);
+        const data = await r.json();
+        setRows(Array.isArray(data) ? data : []);
+      })
+      .catch(e => {
+        setErr(e.message);
+        setRows([]); // prevent rows.map crash
+      });
   }, []);
 
   return (
@@ -22,6 +27,7 @@ export default function VehicleTiles({ selectedId, onSelect }) {
           v.odometer!=null ? `Odometer: ${(v.odometer/1609.344).toFixed(0)} mi` : null,
           v.regDue ? `Reg Due: ${new Date(v.regDue).toLocaleDateString()}` : null
         ].filter(Boolean).join(" • ");
+
         return (
           <div
             key={v.id}
@@ -37,7 +43,6 @@ export default function VehicleTiles({ selectedId, onSelect }) {
                 <div className="small">{v.driverName || "No driver"}</div>
               </div>
             </div>
-            {/* right side could show a tiny badge */}
           </div>
         );
       })}

@@ -10,20 +10,14 @@ import {
 const r = Router();
 const prisma = new PrismaClient();
 
-// Simple sanity route
+// sanity
 r.get("/test", (_req, res) => res.json([{ id: "veh-1", name: "Test Vehicle" }]));
 
-/** Basic tile shape for the left sidebar */
+// ---- SUMMARY FIRST ----
 type TileBase = { id: string; name: string; plate: string | null };
 
-/**
- * GET /api/vehicles/summary
- * Tiles data for the left sidebar: name, status dot, current driver, odometer, reg due.
- * (Intentionally declared BEFORE any `/:id/...` routes)
- */
 r.get("/summary", async (_req, res) => {
   try {
-    // 1) Base vehicles from Samsara
     const data: any = await listVehicles();
     const raw: any[] = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
     const base: TileBase[] = (raw || [])
@@ -36,7 +30,6 @@ r.get("/summary", async (_req, res) => {
 
     const ids: string[] = base.map((v: TileBase) => v.id);
 
-    // 2) Stats in bulk (status + odometer)
     const TYPES = (process.env.SAMSARA_STATS_TYPES ??
       "obdOdometerMeters,engineHourMeters,fuelPercents,engineStates")
       .split(",").map(s => s.trim()).filter(Boolean);
@@ -49,19 +42,11 @@ r.get("/summary", async (_req, res) => {
         const vid = String(item?.vehicle?.id ?? item?.vehicleId ?? "");
         if (vid) statsById[vid] = item;
       }
-    } catch {
-      statsById = {};
-    }
+    } catch { statsById = {}; }
 
-    // 3) Current driver names (best-effort)
     let driverByVehicle: Record<string, string> = {};
-    try {
-      driverByVehicle = await currentAssignmentsByVehicle(ids);
-    } catch {
-      driverByVehicle = {};
-    }
+    try { driverByVehicle = await currentAssignmentsByVehicle(ids); } catch { driverByVehicle = {}; }
 
-    // 4) Registration due (from DB rule type="registration")
     const regs = await prisma.vehicleMaintenanceRule.findMany({
       where: { type: "registration", vehicleId: { in: ids } },
       select: { vehicleId: true, dueDate: true },
@@ -70,10 +55,8 @@ r.get("/summary", async (_req, res) => {
       regs.map(r => [r.vehicleId, r.dueDate?.toISOString() ?? null]),
     );
 
-    // 5) Merge tiles
     const tiles = base.map((v: TileBase) => {
       const s = statsById[v.id] || {};
-      // Normalize engine state → status
       let status: "moving" | "on" | "idle" | "off" | "unknown" = "unknown";
       const st = s?.engineStates?.[0]?.value ?? s?.engineState ?? s?.engine?.state;
       if (["Moving", "moving"].includes(st)) status = "moving";
@@ -81,7 +64,6 @@ r.get("/summary", async (_req, res) => {
       else if (["Idle", "idle"].includes(st)) status = "idle";
       else if (["Off", "off"].includes(st)) status = "off";
 
-      // Odometer in meters if present
       const odometer: number | undefined =
         s?.obdOdometerMeters?.[0]?.value ??
         s?.odometerMeters?.[0]?.value ??
@@ -105,9 +87,7 @@ r.get("/summary", async (_req, res) => {
   }
 });
 
-/** GET /api/vehicles
- * Basic list (used in other places)
- */
+// ---- BASIC LIST ----
 r.get("/", async (_req, res) => {
   try {
     const data: any = await listVehicles();
@@ -127,9 +107,7 @@ r.get("/", async (_req, res) => {
   }
 });
 
-/** GET /api/vehicles/:id/stats
- * Resilient stats: always 200; returns { source, stats, error? }
- */
+// ---- STATS (always 200) ----
 r.get("/:id/stats", async (req, res) => {
   const id = req.params.id;
   try {
@@ -143,7 +121,7 @@ r.get("/:id/stats", async (req, res) => {
   }
 });
 
-/** GET /api/vehicles/:id/maintenance-rules */
+// ---- MAINTENANCE RULES ----
 r.get("/:id/maintenance-rules", async (req, res) => {
   try {
     const rules = await prisma.vehicleMaintenanceRule.findMany({
@@ -157,7 +135,6 @@ r.get("/:id/maintenance-rules", async (req, res) => {
   }
 });
 
-/** POST /api/vehicles/:id/maintenance-rules */
 r.post("/:id/maintenance-rules", async (req, res) => {
   const vehicleId = req.params.id;
   const {
@@ -186,7 +163,6 @@ r.post("/:id/maintenance-rules", async (req, res) => {
     });
     res.json(created);
   } catch (e: any) {
-    // If you see a foreign key error here, seed a Vehicle row (id = Samsara id) or relax FK.
     console.error("rules create error:", e);
     res.status(200).json({ error: e.message || "Could not create rule" });
   }
