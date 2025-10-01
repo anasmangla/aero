@@ -2,22 +2,23 @@ import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
 import {
   listVehicles,
-  vehicleStatsFlexible,
   bulkVehicleStats,
   currentAssignmentsByVehicle,
 } from "../lib/samsara";
 
 const r = Router();
 const prisma = new PrismaClient();
+r.get("/__ping", (_req, res) => res.json({ ok: true, from: "vehicles.ts you just edited" }));
 
-// sanity
+// Sanity
 r.get("/test", (_req, res) => res.json([{ id: "veh-1", name: "Test Vehicle" }]));
 
-// ---- SUMMARY FIRST ----
+// ---- SUMMARY FIRST (for left tiles) ----
 type TileBase = { id: string; name: string; plate: string | null };
 
 r.get("/summary", async (_req, res) => {
   try {
+    // 1) base vehicles
     const data: any = await listVehicles();
     const raw: any[] = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
     const base: TileBase[] = (raw || [])
@@ -30,6 +31,7 @@ r.get("/summary", async (_req, res) => {
 
     const ids: string[] = base.map((v: TileBase) => v.id);
 
+    // 2) stats (odometer + engine state) — best effort
     const TYPES = (process.env.SAMSARA_STATS_TYPES ??
       "obdOdometerMeters,engineHourMeters,fuelPercents,engineStates")
       .split(",").map(s => s.trim()).filter(Boolean);
@@ -44,9 +46,12 @@ r.get("/summary", async (_req, res) => {
       }
     } catch { statsById = {}; }
 
+    // 3) current driver (best effort)
     let driverByVehicle: Record<string, string> = {};
-    try { driverByVehicle = await currentAssignmentsByVehicle(ids); } catch { driverByVehicle = {}; }
+    try { driverByVehicle = await currentAssignmentsByVehicle(ids); }
+    catch { driverByVehicle = {}; }
 
+    // 4) registration due date (DB rule type="registration")
     const regs = await prisma.vehicleMaintenanceRule.findMany({
       where: { type: "registration", vehicleId: { in: ids } },
       select: { vehicleId: true, dueDate: true },
@@ -55,6 +60,7 @@ r.get("/summary", async (_req, res) => {
       regs.map(r => [r.vehicleId, r.dueDate?.toISOString() ?? null]),
     );
 
+    // 5) merge
     const tiles = base.map((v: TileBase) => {
       const s = statsById[v.id] || {};
       let status: "moving" | "on" | "idle" | "off" | "unknown" = "unknown";
@@ -107,16 +113,50 @@ r.get("/", async (_req, res) => {
   }
 });
 
-// ---- STATS (always 200) ----
+// ---- STATS (SELF-CONTAINED; includes &types=) ----
 r.get("/:id/stats", async (req, res) => {
   const id = req.params.id;
+
+  // Build the 'types' here so we don't depend on lib mismatches
+  const TYPES = (process.env.SAMSARA_STATS_TYPES ??
+    "obdOdometerMeters,engineHourMeters,fuelPercents,engineStates")
+    .split(",").map(s => s.trim()).filter(Boolean);
+
+  const t = encodeURIComponent(TYPES.join(","));
+
+  // Minimal internal fetch to avoid helper drift
+  async function sFetch(path: string) {
+    const resp = await fetch(`https://api.samsara.com${path}`, {
+      headers: {
+        "Authorization": `Bearer ${process.env.SAMSARA_API_TOKEN}`,
+        "Content-Type": "application/json",
+      }
+    } as any);
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(`Samsara ${resp.status}: ${text}`);
+    }
+    return resp.json();
+  }
+
   try {
-    const result = await vehicleStatsFlexible(id);
-    if (result.ok) return res.json({ source: result.path, stats: result.data });
-    console.warn("stats fallback", result.error);
-    return res.json({ source: "fallback", stats: null, error: result.error });
+    const tries = [
+      `/fleet/vehicles/stats?ids=${id}&types=${t}`,
+      `/fleet/vehicles/stats?vehicleIds=${id}&types=${t}`,
+      `/fleet/vehicles/${id}`,
+      `/fleet/vehicles/locations?ids=${id}`,
+    ];
+    let lastErr = "";
+    for (const p of tries) {
+      try {
+        const data = await sFetch(p);
+        return res.json({ source: p, stats: data });
+      } catch (e: any) {
+        lastErr = String(e?.message || e);
+      }
+    }
+    return res.json({ source: "fallback", stats: null, error: lastErr });
   } catch (e: any) {
-    console.error("stats error:", e);
     return res.json({ source: "catch", stats: null, error: e.message || "Stats unavailable" });
   }
 });
@@ -131,7 +171,7 @@ r.get("/:id/maintenance-rules", async (req, res) => {
     res.json(rules);
   } catch (e: any) {
     console.error("rules get error:", e);
-    res.json([]); // return empty if DB unhappy
+    res.json([]); // keep UI alive
   }
 });
 
@@ -163,7 +203,6 @@ r.post("/:id/maintenance-rules", async (req, res) => {
     });
     res.json(created);
   } catch (e: any) {
-    console.error("rules create error:", e);
     res.status(200).json({ error: e.message || "Could not create rule" });
   }
 });
