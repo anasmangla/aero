@@ -42,3 +42,44 @@ r.get("/:id/stats", async (req, res) => {
 });
 
 export default r;
+import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient();
+
+/** List rules for a vehicle */
+r.get("/:id/maintenance-rules", async (req, res) => {
+  try {
+    const rules = await prisma.vehicleMaintenanceRule.findMany({
+      where: { vehicleId: req.params.id },
+      orderBy: { type: "asc" }
+    });
+    res.json(rules);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/** Create a rule for a vehicle */
+r.post("/:id/maintenance-rules", async (req, res) => {
+  const vehicleId = req.params.id;
+  const { type, dueDate, dueMiles, dueHours, thresholdDays, thresholdMiles, thresholdHours } = req.body || {};
+  if (!type) return res.status(400).json({ error: "type is required" });
+
+  try {
+    const created = await prisma.vehicleMaintenanceRule.create({
+      data: {
+        vehicleId,
+        type,
+        dueDate: dueDate ? new Date(dueDate) : null,
+        dueMiles: dueMiles ?? null,
+        dueHours: dueHours ?? null,
+        thresholdDays: thresholdDays ?? null,
+        thresholdMiles: thresholdMiles ?? null,
+        thresholdHours: thresholdHours ?? null
+      }
+    });
+    res.json(created);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
