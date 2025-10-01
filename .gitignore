@@ -1,0 +1,13 @@
+# node
+node_modules/
+# env & secrets
+*.env
+server/.env
+server/gservice.json
+# build
+dist/
+# uploads
+server/uploads/
+# OS
+.DS_Store
+Thumbs.db

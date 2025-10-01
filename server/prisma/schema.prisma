@@ -1,0 +1,112 @@
+// --- Prisma schema for Aero ---
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Vehicle {
+  id               String                   @id @default(cuid())
+  samsaraId        String?                  @unique
+  name             String?
+  vin              String?
+  plate            String?
+  year             Int?
+  make             String?
+  model            String?
+  lastOdometer     Int?
+  lastEngineHours  Int?
+  lastFuelPct      Int?
+  lastSeenAt       DateTime?
+  notes            String?
+  maintenanceRules VehicleMaintenanceRule[]
+  maintenanceLogs  VehicleMaintenanceLog[]
+  documents        Document[]
+}
+
+model VehicleMaintenanceRule {
+  id             String    @id @default(cuid())
+  vehicleId      String
+  type           String // registration|inspection|oil|tires|brakes|custom
+  dueDate        DateTime?
+  dueMiles       Int?
+  dueHours       Int?
+  thresholdDays  Int?
+  thresholdMiles Int?
+  thresholdHours Int?
+  vehicle        Vehicle   @relation(fields: [vehicleId], references: [id])
+}
+
+model VehicleMaintenanceLog {
+  id          String   @id @default(cuid())
+  vehicleId   String
+  type        String
+  serviceDate DateTime
+  atMiles     Int?
+  atHours     Int?
+  cost        Int?
+  vendor      String?
+  notes       String?
+  driveFileId String?
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
+}
+
+model Driver {
+  id               String          @id @default(cuid())
+  samsaraId        String?         @unique
+  name             String
+  phone            String?
+  email            String?
+  licenseNumber    String?
+  licenseState     String?
+  licenseClass     String?
+  licenseExpiresOn DateTime?
+  medCardExpiresOn DateTime?
+  hireDate         DateTime?
+  status           String? // active|inactive
+  emergencyContact String?
+  notes            String?
+  writeups         DriverWriteup[]
+  timeOffs         DriverTimeOff[]
+  documents        Document[]
+}
+
+model DriverWriteup {
+  id          String   @id @default(cuid())
+  driverId    String
+  date        DateTime
+  category    String?
+  description String
+  actionTaken String?
+  driveFileId String?
+  driver      Driver   @relation(fields: [driverId], references: [id])
+}
+
+model DriverTimeOff {
+  id        String   @id @default(cuid())
+  driverId  String
+  type      String // pto|sick|unpaid
+  startDate DateTime
+  endDate   DateTime
+  status    String // pending|approved|denied
+  notes     String?
+  driver    Driver   @relation(fields: [driverId], references: [id])
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  entityType  String // vehicle|driver
+  entityId    String
+  label       String
+  driveFileId String
+  mimeType    String?
+  uploadedAt  DateTime @default(now())
+  Vehicle     Vehicle? @relation(fields: [vehicleId], references: [id])
+  vehicleId   String?
+  Driver      Driver?  @relation(fields: [driverId], references: [id])
+  driverId    String?
+}
