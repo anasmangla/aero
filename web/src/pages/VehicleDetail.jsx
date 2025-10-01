@@ -1,21 +1,19 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState, useCallback, useRef } from "react";
-
 const API = "http://localhost:8080";
 
 export default function VehicleDetail() {
   const { id } = useParams();
-  const [stats, setStats] = useState(null);
-  const [err, setErr] = useState("");
+  const [payload, setPayload] = useState(null);   // { source, stats, error }
   const [rules, setRules] = useState([]);
   const [form, setForm] = useState({ type:"oil", dueDate:"", dueMiles:"", dueHours:"", thresholdDays:"", thresholdMiles:"500", thresholdHours:"" });
   const fileRef = useRef();
 
   useEffect(() => {
     fetch(`${API}/api/vehicles/${encodeURIComponent(id)}/stats`)
-      .then(r => { if (!r.ok) throw new Error(`Stats ${r.status}`); return r.json(); })
-      .then(setStats)
-      .catch(e => setErr(e.message));
+      .then(r => r.json())
+      .then(setPayload)
+      .catch(() => setPayload({ source:"client", stats:null, error:"fetch failed" }));
 
     fetch(`${API}/api/vehicles/${encodeURIComponent(id)}/maintenance-rules`)
       .then(r => r.json()).then(setRules).catch(()=>{});
@@ -29,8 +27,11 @@ export default function VehicleDetail() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     })
-      .then(r => { if (!r.ok) throw new Error("Create failed"); return r.json(); })
-      .then(r => setRules(prev => [...prev, r]))
+      .then(r => r.json())
+      .then(r => {
+        if (r?.error) return alert(r.error);
+        setRules(prev => [...prev, r]);
+      })
       .catch(err => alert(err.message));
   }, [form, id]);
 
@@ -52,9 +53,11 @@ export default function VehicleDetail() {
       <h4 className="mb-3">Vehicle Detail</h4>
       <div className="mb-2 text-muted">ID: {id}</div>
 
-      {err && <div className="alert alert-warning">Stats error: {err}</div>}
+      {payload?.error && (
+        <div className="alert alert-info">Live stats not available yet. ({payload.error})</div>
+      )}
       <pre className="p-3 bg-light border rounded" style={{whiteSpace:"pre-wrap"}}>
-        {JSON.stringify(stats, null, 2)}
+        {JSON.stringify(payload, null, 2)}
       </pre>
 
       <h5 className="mt-4">Maintenance Rules</h5>

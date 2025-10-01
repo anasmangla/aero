@@ -13,7 +13,6 @@ export default function Vehicles() {
       .then(setRows)
       .catch(e => {
         setErr(e.message);
-        // fallback to test endpoint so you see something
         fetch(`${API}/api/vehicles/test`).then(r=>r.json()).then(setRows).catch(()=>{});
       });
   }, []);

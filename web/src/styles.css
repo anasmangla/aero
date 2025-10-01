@@ -1,0 +1,12 @@
+.layout { display: grid; grid-template-columns: 280px 1fr 320px; gap: 16px; }
+.sidebar { border-right: 1px solid #e5e7eb; padding-right: 12px; overflow:auto; max-height: calc(100vh - 140px); }
+.tile { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; margin-bottom:10px; cursor:pointer; background:#fff; }
+.tile:hover { background:#f8fafc; }
+.tile .left { display:flex; align-items:center; gap:10px; }
+.dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+.dot.moving { background:#22c55e; } /* green */
+.dot.on { background:#60a5fa; }     /* blue */
+.dot.idle { background:#f59e0b; }   /* amber */
+.dot.off { background:#9ca3af; }    /* gray */
+.dot.unknown { background:#d1d5db; }/* light gray */
+.small { font-size: 12px; color:#6b7280; }

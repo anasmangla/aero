@@ -5,6 +5,7 @@ import App from "./pages/App.jsx";
 import Vehicles from "./pages/Vehicles.jsx";
 import VehicleDetail from "./pages/VehicleDetail.jsx";
 import Drivers from "./pages/Drivers.jsx";
+import "./styles.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
