@@ -10,28 +10,31 @@ import {
 const r = Router();
 const prisma = new PrismaClient();
 
-/** Mount check */
+// Simple sanity route
 r.get("/test", (_req, res) => res.json([{ id: "veh-1", name: "Test Vehicle" }]));
+
+/** Basic tile shape for the left sidebar */
+type TileBase = { id: string; name: string; plate: string | null };
 
 /**
  * GET /api/vehicles/summary
- * Tiles data for the left sidebar: name, status, current driver, odometer, reg due.
- * Ordered BEFORE any `/:id/...` routes on purpose.
+ * Tiles data for the left sidebar: name, status dot, current driver, odometer, reg due.
+ * (Intentionally declared BEFORE any `/:id/...` routes)
  */
 r.get("/summary", async (_req, res) => {
   try {
-    // 1) Base vehicle list from Samsara
+    // 1) Base vehicles from Samsara
     const data: any = await listVehicles();
-    const raw = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
-    const base = (raw || [])
-      .map((v: any) => ({
+    const raw: any[] = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+    const base: TileBase[] = (raw || [])
+      .map((v: any): TileBase => ({
         id: String(v.id ?? v.vehicleId ?? v.externalIds?.vin ?? ""),
         name: v.name ?? v.label ?? v.vehicleName ?? "Unnamed",
         plate: v.licensePlate ?? v.licensePlateNumber ?? null,
       }))
-      .filter(v => v.id);
+      .filter((v: TileBase) => !!v.id);
 
-    const ids = base.map(v => v.id);
+    const ids: string[] = base.map((v: TileBase) => v.id);
 
     // 2) Stats in bulk (status + odometer)
     const TYPES = (process.env.SAMSARA_STATS_TYPES ??
@@ -41,7 +44,7 @@ r.get("/summary", async (_req, res) => {
     let statsById: Record<string, any> = {};
     try {
       const sres: any = await bulkVehicleStats(ids, TYPES);
-      const sItems = Array.isArray(sres?.data) ? sres.data : [];
+      const sItems: any[] = Array.isArray(sres?.data) ? sres.data : [];
       for (const item of sItems) {
         const vid = String(item?.vehicle?.id ?? item?.vehicleId ?? "");
         if (vid) statsById[vid] = item;
@@ -63,14 +66,14 @@ r.get("/summary", async (_req, res) => {
       where: { type: "registration", vehicleId: { in: ids } },
       select: { vehicleId: true, dueDate: true },
     });
-    const regMap = Object.fromEntries(
+    const regMap: Record<string, string | null> = Object.fromEntries(
       regs.map(r => [r.vehicleId, r.dueDate?.toISOString() ?? null]),
     );
 
     // 5) Merge tiles
-    const tiles = base.map(v => {
+    const tiles = base.map((v: TileBase) => {
       const s = statsById[v.id] || {};
-      // Normalize engine state → status dot
+      // Normalize engine state → status
       let status: "moving" | "on" | "idle" | "off" | "unknown" = "unknown";
       const st = s?.engineStates?.[0]?.value ?? s?.engineState ?? s?.engine?.state;
       if (["Moving", "moving"].includes(st)) status = "moving";
@@ -78,8 +81,8 @@ r.get("/summary", async (_req, res) => {
       else if (["Idle", "idle"].includes(st)) status = "idle";
       else if (["Off", "off"].includes(st)) status = "off";
 
-      // Odometer (meters) if present
-      const odometer =
+      // Odometer in meters if present
+      const odometer: number | undefined =
         s?.obdOdometerMeters?.[0]?.value ??
         s?.odometerMeters?.[0]?.value ??
         undefined;
@@ -103,12 +106,12 @@ r.get("/summary", async (_req, res) => {
 });
 
 /** GET /api/vehicles
- * Basic list (used other places)
+ * Basic list (used in other places)
  */
 r.get("/", async (_req, res) => {
   try {
     const data: any = await listVehicles();
-    const raw = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+    const raw: any[] = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
     const vehicles = Array.isArray(raw)
       ? raw.map((v: any) => ({
           id: v.id ?? v.vehicleId ?? v.externalIds?.vin ?? "unknown",
