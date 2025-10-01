@@ -19,14 +19,6 @@ async function sFetch(path: string, init: any = {}) {
   return res.json();
 }
 
-export const listVehicles = () => sFetch("/fleet/vehicles");
+export const listVehicles = () => sFetch("/fleet/vehicles"); // v2
 export const vehicleStats = (ids: string[]) =>
   sFetch(`/fleet/vehicles/stats?ids=${ids.join(",")}`);
-export const listDrivers = () => sFetch("/fleet/drivers");
-export const createDriver = (payload: any) =>
-  sFetch("/fleet/drivers", { method: "POST", body: JSON.stringify(payload) });
-// assignments (optional later)
-export const listAssignments = (query: string) =>
-  sFetch(`/fleet/driver-vehicle-assignments${query}`);
-export const createAssignment = (payload: any) =>
-  sFetch("/fleet/driver-vehicle-assignments", { method: "POST", body: JSON.stringify(payload) });
