@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
-const API = "http://localhost:8080";
+import { API_BASE, FALLBACK_VEHICLES } from "../config";
 
 export default function VehicleTiles({ selectedId, onSelect }) {
   const [rows, setRows] = useState([]);
   const [err, setErr] = useState("");
+  const normalizedSelected = selectedId != null ? String(selectedId) : null;
 
   useEffect(() => {
-    fetch(`${API}/api/vehicles/summary`)
+    if (!API_BASE) {
+      setRows(FALLBACK_VEHICLES);
+      setErr("Demo data shown because the live API is unavailable.");
+      return;
+    }
+
+    fetch(`${API_BASE}/api/vehicles/summary`)
       .then(async r => {
         if (!r.ok) throw new Error(`summary ${r.status}`);
         const data = await r.json();
@@ -14,14 +21,15 @@ export default function VehicleTiles({ selectedId, onSelect }) {
       })
       .catch(e => {
         setErr(e.message);
-        setRows([]); // prevent rows.map crash
+        setRows(FALLBACK_VEHICLES);
       });
   }, []);
 
   return (
     <div className="sidebar">
-      {err && <div className="alert alert-warning">Tiles error: {err}</div>}
+      {err && <div className="alert alert-warning">{err}</div>}
       {rows.map(v => {
+        const id = String(v.id);
         const title = [
           v.plate ? `Plate: ${v.plate}` : null,
           v.odometer!=null ? `Odometer: ${(v.odometer/1609.344).toFixed(0)} mi` : null,
@@ -30,11 +38,11 @@ export default function VehicleTiles({ selectedId, onSelect }) {
 
         return (
           <div
-            key={v.id}
+            key={id}
             className="tile"
             title={title}
-            onClick={() => onSelect(v.id)}
-            style={{ borderColor: selectedId===v.id ? "#60a5fa" : undefined }}
+            onClick={() => onSelect(id)}
+            style={{ borderColor: normalizedSelected===id ? "#60a5fa" : undefined }}
           >
             <div className="left">
               <span className={`dot ${v.status||"unknown"}`} />

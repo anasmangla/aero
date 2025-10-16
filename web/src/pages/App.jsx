@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation, useNavigate, useParams, Routes, Route, Navigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import VehicleTiles from "../components/VehicleTiles.jsx";
 import EmployeesPanel from "../components/EmployeesPanel.jsx";
@@ -30,8 +30,8 @@ export default function App() {
       </div>
 
       <nav className="mb-3">
-        <Link className={`me-3 ${pathname.startsWith("/vehicles") ? "fw-bold" : ""}`} to="/vehicles">Vehicles</Link>
-        <Link className={`${pathname.startsWith("/drivers") ? "fw-bold" : ""}`} to="/drivers">Drivers</Link>
+        <Link className={`me-3 ${pathname.includes("/vehicles") ? "fw-bold" : ""}`} to="/vehicles">Vehicles</Link>
+        <Link className={`${pathname.includes("/drivers") ? "fw-bold" : ""}`} to="/drivers">Drivers</Link>
       </nav>
 
       <div className="layout">
@@ -39,10 +39,10 @@ export default function App() {
         <div>
           {/* Middle: your existing routes */}
           <Routes>
-            <Route index element={<Navigate to="/vehicles" />} />
-            <Route path="/vehicles" element={<div className="small text-muted">Select a vehicle on the left.</div>} />
-            <Route path="/vehicles/:id" element={<VehicleDetail />} />
-            <Route path="/drivers" element={<Drivers />} />
+            <Route index element={<Navigate to="vehicles" replace />} />
+            <Route path="vehicles" element={<div className="small text-muted">Select a vehicle on the left.</div>} />
+            <Route path="vehicles/:id" element={<VehicleDetail />} />
+            <Route path="drivers" element={<Drivers />} />
           </Routes>
         </div>
         <EmployeesPanel vehicleId={selected} />
