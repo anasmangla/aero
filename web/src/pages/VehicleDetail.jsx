@@ -1,21 +1,36 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState, useCallback, useRef } from "react";
-const API = "http://localhost:8080";
+import { API_BASE, getVehicleFallback } from "../config";
 
 export default function VehicleDetail() {
   const { id } = useParams();
   const [payload, setPayload] = useState(null);   // { source, stats, error }
   const [rules, setRules] = useState([]);
-  const [form, setForm] = useState({ type:"oil", dueDate:"", dueMiles:"", dueHours:"", thresholdDays:"", thresholdMiles:"500", thresholdHours:"" });
+  const [form, setForm] = useState({
+    type: "oil",
+    dueDate: "",
+    dueMiles: "",
+    dueHours: "",
+    thresholdDays: "",
+    thresholdMiles: "500",
+    thresholdHours: ""
+  });
   const fileRef = useRef();
 
   useEffect(() => {
-    fetch(`${API}/api/vehicles/${encodeURIComponent(id)}/stats`)
+    if (!API_BASE) {
+      const fallback = getVehicleFallback(id);
+      setPayload(fallback ? { source: "sample", stats: fallback.stats, error: null } : { source: "sample", stats: null, error: "Vehicle not found" });
+      setRules(fallback?.maintenanceRules ?? []);
+      return;
+    }
+
+    fetch(`${API_BASE}/api/vehicles/${encodeURIComponent(id)}/stats`)
       .then(r => r.json())
       .then(setPayload)
       .catch(() => setPayload({ source:"client", stats:null, error:"fetch failed" }));
 
-    fetch(`${API}/api/vehicles/${encodeURIComponent(id)}/maintenance-rules`)
+    fetch(`${API_BASE}/api/vehicles/${encodeURIComponent(id)}/maintenance-rules`)
       .then(r => r.json()).then(setRules).catch(()=>{});
   }, [id]);
 
@@ -23,7 +38,12 @@ export default function VehicleDetail() {
     e.preventDefault();
     const payload = { ...form };
     Object.keys(payload).forEach(k => { if (payload[k] === "") payload[k] = null; });
-    fetch(`${API}/api/vehicles/${encodeURIComponent(id)}/maintenance-rules`, {
+    if (!API_BASE) {
+      alert("Saving rules is disabled in demo mode.");
+      return;
+    }
+
+    fetch(`${API_BASE}/api/vehicles/${encodeURIComponent(id)}/maintenance-rules`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     })
@@ -42,7 +62,12 @@ export default function VehicleDetail() {
     const fd = new FormData();
     fd.append("file", f);
     fd.append("label", f.name);
-    const res = await fetch(`${API}/api/docs/upload`, { method: "POST", body: fd });
+    if (!API_BASE) {
+      alert("Uploading documents is disabled in demo mode.");
+      return;
+    }
+
+    const res = await fetch(`${API_BASE}/api/docs/upload`, { method: "POST", body: fd });
     const json = await res.json();
     if (!res.ok) return alert(json.error || "Upload failed");
     alert(`Uploaded: ${json.webViewLink || json.id}`);
