@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
+import type { VehicleMaintenanceRule } from "@prisma/client";
 import {
   listVehicles,
   bulkVehicleStats,
@@ -52,12 +53,12 @@ r.get("/summary", async (_req, res) => {
     catch { driverByVehicle = {}; }
 
     // 4) registration due date (DB rule type="registration")
-    const regs = await prisma.vehicleMaintenanceRule.findMany({
+    const regs: Pick<VehicleMaintenanceRule, "vehicleId" | "dueDate">[] = await prisma.vehicleMaintenanceRule.findMany({
       where: { type: "registration", vehicleId: { in: ids } },
       select: { vehicleId: true, dueDate: true },
     });
     const regMap: Record<string, string | null> = Object.fromEntries(
-      regs.map(r => [r.vehicleId, r.dueDate?.toISOString() ?? null]),
+      regs.map((r) => [r.vehicleId, r.dueDate?.toISOString() ?? null]),
     );
 
     // 5) merge
